@@ -4,8 +4,7 @@
   "description": "",
   "main": "index.ts",
   "scripts": {
-    "start": "ts-node src/index.ts",
-    "prepare": "husky install"
+    "start": "ts-node src/index.ts"
   },
   "author": "",
   "license": "ISC",

@@ -5,11 +5,15 @@ import Unstake from "../models/Unstake";
 import DoUnStake from "../models/DoUnStake";
 import { logger } from "../logger/logger";
 import { config } from "../config/config";
-import { web3, getStakeManngerAddress } from "../web3";
+import { web3, getStakeManagerAddress } from "../web3";
 import { decodeLog } from "../abi/StakeMannger";
 import sequelize from "../db/db";
+import { Queue } from "../queue";
+import { Log } from "web3-core";
 
 const STATE_FILE = path.resolve("./output/eth.json");
+
+const logQueue = new Queue<Log>();
 
 let currentBlock = 0;
 
@@ -48,13 +52,13 @@ const dealWithTopic = async (receipt) => {
       logger.warn("Connot get transaction by txid", txid);
     }
     if (receipt.topics[0] == config.gxchain2.topics.Stake) {
-      dealWithStake(receipt, tx);
+      await dealWithStake(receipt, tx);
     }
     if (receipt.topics[0] == config.gxchain2.topics.StartUnstake) {
-      dealWithStartUnstake(receipt, tx);
+      await dealWithStartUnstake(receipt, tx);
     }
     if (receipt.topics[0] == config.gxchain2.topics.DoUnstake) {
-      dealWithDoUnStake(receipt, tx);
+      await dealWithDoUnStake(receipt, tx);
     }
     currentBlock = tx.blockNumber;
   } catch (err) {
@@ -65,7 +69,7 @@ const dealWithTopic = async (receipt) => {
 const dealWithStake = async (receipt, tx) => {
   logger.info("New Stake tx detected : ", tx.hash);
   const transaction = await sequelize.transaction();
-  let instance = await Stake.findByPk(tx.hash);
+  let instance = await Stake.findByPk(tx.hash, { transaction });
   if (!instance) {
     let stakeParams = decodeLog("Stake", receipt.data, receipt.topics.slice(1));
     if (
@@ -103,7 +107,7 @@ const dealWithStake = async (receipt, tx) => {
 const dealWithStartUnstake = async (receipt, tx) => {
   logger.info("New StartUnstake tx detected : ", tx.hash);
   const transaction = await sequelize.transaction();
-  let instance = await Unstake.findByPk(tx.hash);
+  let instance = await Unstake.findByPk(tx.hash, { transaction });
   if (!instance) {
     let startUnstakeParams = decodeLog(
       "StartUnstake",
@@ -153,15 +157,13 @@ const dealWithDoUnStake = async (receipt, tx) => {
   logger.info("New DoUnStake tx detected : ", tx.hash);
   const timestamp = (await web3.eth.getBlock(tx.blockNumber)).timestamp;
   const transaction = await sequelize.transaction();
-  let instance = await DoUnStake.findByPk(tx.hash);
+  let instance = await DoUnStake.findByPk(tx.hash, { transaction });
   if (!instance) {
     let DoUnstakeParams = decodeLog(
       "DoUnstake",
       receipt.data,
       receipt.topics.slice(1)
     );
-    console.log("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
-    console.log(DoUnstakeParams);
     if (
       DoUnstakeParams.validator &&
       DoUnstakeParams.id &&
@@ -190,7 +192,7 @@ const dealWithDoUnStake = async (receipt, tx) => {
           unstake.state = 1;
           unstake.amount = BigInt(DoUnstakeParams.amount);
           unstake.unstakedtimestamp = BigInt(timestamp);
-          await unstake.save();
+          await unstake.save({ transaction });
         }
         await transaction.commit();
       } catch (err) {
@@ -227,13 +229,25 @@ const _startAfterSync = async (callback) => {
   }
 };
 
-let _restartTimeout = null;
-const RESTART_TIME_INTERVAL = 2 * 60 * 1000;
-let lastTime = Number(new Date());
+let lastTime = Date.now();
+
+const logsLoop = async () => {
+  logger.info("start logsLoop loop");
+  while (1) {
+    let log = logQueue.pop();
+    if (!log) {
+      log = await new Promise<Log>((resolve) => {
+        logQueue.queueresolve = resolve;
+      });
+    }
+    await dealWithTopic(log);
+  }
+};
 
 export const start = async () => {
+  const stakeManagerAddress = await getStakeManagerAddress();
   readState();
-  _startAfterSync(async () => {
+  _startAfterSync(() => {
     web3.eth
       .subscribe("newBlockHeaders")
       .on("connected", (subscriptionId) => {
@@ -246,10 +260,10 @@ export const start = async () => {
           "Gas used:",
           blockheader.gasUsed / blockheader.gasLimit,
           "+",
-          Number(new Date()) - lastTime,
+          Date.now() - lastTime,
           "ms"
         );
-        lastTime = Number(new Date());
+        lastTime = Date.now();
       })
       .on("error", (err) => {
         logger.error("Error: newBlockHeaders", JSON.stringify(err, null, "  "));
@@ -258,7 +272,7 @@ export const start = async () => {
     web3.eth
       .subscribe("logs", {
         fromBlock: currentBlock,
-        address: await getStakeManngerAddress(),
+        address: stakeManagerAddress,
         topics: [config.gxchain2.topics.Stake],
       })
       .on("connected", (subscriptionId) => {
@@ -279,7 +293,7 @@ export const start = async () => {
     web3.eth
       .subscribe("logs", {
         fromBlock: currentBlock,
-        address: await getStakeManngerAddress(),
+        address: stakeManagerAddress,
         topics: [config.gxchain2.topics.StartUnstake],
       })
       .on("connected", (subscriptionId) => {
@@ -288,7 +302,7 @@ export const start = async () => {
         });
       })
       .on("data", (data) => {
-        dealWithTopic(data);
+        logQueue.push(data);
       })
       .on("changed", function (changed) {
         logger.warn("changed", JSON.stringify(changed, null, "  "));
@@ -300,7 +314,7 @@ export const start = async () => {
     web3.eth
       .subscribe("logs", {
         fromBlock: currentBlock,
-        address: await getStakeManngerAddress(),
+        address: stakeManagerAddress,
         topics: [config.gxchain2.topics.DoUnstake],
       })
       .on("connected", (subscriptionId) => {
@@ -309,7 +323,7 @@ export const start = async () => {
         });
       })
       .on("data", (data) => {
-        dealWithTopic(data);
+        logQueue.push(data);
       })
       .on("changed", function (changed) {
         logger.warn("changed", JSON.stringify(changed, null, "  "));
@@ -318,4 +332,5 @@ export const start = async () => {
         logger.error("Error: logs", JSON.stringify(err, null, "  "));
       });
   });
+  logsLoop();
 };

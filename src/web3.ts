@@ -11,6 +11,6 @@ export const configContract = new web3.eth.Contract(
   {}
 );
 
-export async function getStakeManngerAddress() {
+export async function getStakeManagerAddress() {
   return await configContract.methods.stakeManager().call();
 }
