@@ -1,1 +1,1 @@
-# staking_monitor
+# staking-monitor
