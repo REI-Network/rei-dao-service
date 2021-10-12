@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import Stake from "../models/Stake";
 import Unstake from "../models/Unstake";
-import DoUnStake from "../models/DoUnstake";
+import DoUnStake from "../models/DoUnStake";
 import { logger } from "../logger/logger";
 import { config } from "../config/config";
 import { web3, getStakeManngerAddress } from "../web3";
