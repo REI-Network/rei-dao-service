@@ -2,6 +2,7 @@ import * as monitor_task from "./tasks/index";
 import { logger } from "./logger/logger";
 import fs from "fs";
 import { init } from "./db/db";
+import * as api from "./api";
 
 const dir = "./output";
 if (!fs.existsSync(dir)) {
@@ -13,6 +14,7 @@ function startTask() {
   logger.info("Trying to start stake_monitor)");
   init().then(() => {
     monitor_task.start();
+    api.start();
     startProcessListener();
   });
 }
