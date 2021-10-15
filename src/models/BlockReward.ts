@@ -7,7 +7,7 @@ export declare interface BlockReward {
   blockNumber: number;
   blockHash: string;
   blockMiner: string;
-  blockReward: string;
+  blockReward: bigint;
 }
 
 BlockReward.init(
@@ -24,7 +24,7 @@ BlockReward.init(
       type: DataTypes.STRING,
     },
     blockReward: {
-      type: DataTypes.STRING,
+      type: DataTypes.BIGINT,
     },
   },
   {

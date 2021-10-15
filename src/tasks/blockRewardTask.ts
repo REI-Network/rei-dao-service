@@ -10,7 +10,7 @@ const STATE_FILE = path.resolve("./output/gxchain.json");
 const debug = process.env["NODE_ENV"] == "debug" ? 1 : 0;
 
 let currentblock = 0;
-let rewardPerBlock: number;
+let rewardPerBlock: bigint;
 
 export const saveState = () => {
   web3.eth.clearSubscriptions(() => {});
@@ -32,7 +32,7 @@ export const saveState = () => {
 const readState = async () => {
   logger.info("Start to read and sync state");
   const rewardFactor = await getBlcokRewardFactor();
-  rewardPerBlock = config.gxchain2.rewardPerBlock * rewardFactor;
+  rewardPerBlock = BigInt(config.gxchain2.rewardPerBlock * rewardFactor);
   try {
     const transaction = await sequelize.transaction();
     const lastInstance = await BlockReward.findOne({
