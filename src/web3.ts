@@ -14,3 +14,7 @@ export const configContract = new web3.eth.Contract(
 export async function getStakeManagerAddress() {
   return await configContract.methods.stakeManager().call();
 }
+
+export async function getBlcokRewardFactor() {
+  return await configContract.methods.minerRewardFactor().call();
+}

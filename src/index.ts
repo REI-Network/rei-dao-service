@@ -1,4 +1,5 @@
-import * as monitor_task from "./tasks/index";
+import * as stake_task from "./tasks/stakeTask";
+import * as block_task from "./tasks/blockRewardTask";
 import { logger } from "./logger/logger";
 import fs from "fs";
 import { init } from "./db/db";
@@ -13,7 +14,8 @@ startTask();
 function startTask() {
   logger.info("Trying to start stake_monitor)");
   init().then(() => {
-    monitor_task.start();
+    stake_task.start();
+    block_task.start();
     api.start();
     startProcessListener();
   });
@@ -50,5 +52,5 @@ function exitHandler(options: any, exitCode: any) {
 
 function stopTask() {
   logger.info("Saving relay status");
-  monitor_task.saveState();
+  stake_task.saveState();
 }
