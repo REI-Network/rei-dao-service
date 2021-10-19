@@ -33,8 +33,8 @@ const readState = async () => {
   logger.info("Start to read and sync state");
   const rewardFactor = await getBlcokRewardFactor();
   rewardPerBlock = BigInt(config.gxchain2.rewardPerBlock * rewardFactor);
+  const transaction = await sequelize.transaction();
   try {
-    const transaction = await sequelize.transaction();
     const lastInstance = await BlockReward.findOne({
       order: [["blockNumber", "DESC"]],
       transaction,
@@ -42,35 +42,46 @@ const readState = async () => {
     currentblock = lastInstance ? lastInstance.blockNumber : 0;
     await transaction.commit();
   } catch (err) {
-    throw err;
+    await transaction.rollback();
+    logger.err(err);
   }
 
-  while (currentblock <= (await web3.eth.getBlock("latest")).number) {
+  let blockNow = (await web3.eth.getBlock("latest")).number;
+  while (blockNow <= (await web3.eth.getBlock("latest")).number) {
+    _catchBlock(blockNow++);
+  }
+};
+
+const _catchBlock = async (targetBlock) => {
+  while (currentblock <= targetBlock) {
     const blockNow = await web3.eth.getBlock(currentblock++);
     await _createRecord(blockNow);
   }
-  logger.info("readState end");
 };
 
 const _createRecord = async (block) => {
   const transaction = await sequelize.transaction();
-  const instance = await BlockReward.findByPk(block.number, { transaction });
-  if (!instance) {
-    await BlockReward.create(
-      {
-        blockNumber: block.number,
-        blockHash: block.hash,
-        blockMiner: block.miner,
-        blockReward: rewardPerBlock,
-      },
-      { transaction }
-    );
-    await transaction.commit();
-  } else {
-    logger.error("the block exist in record, skip");
+  try {
+    const instance = await BlockReward.findByPk(block.number, { transaction });
+    if (!instance) {
+      await BlockReward.create(
+        {
+          blockNumber: block.number,
+          blockHash: block.hash,
+          blockMiner: block.miner,
+          blockReward: rewardPerBlock,
+        },
+        { transaction }
+      );
+      await transaction.commit();
+    } else {
+      logger.error("the block exist in record, skip");
+    }
+  } catch (err) {
+    await transaction.rollback();
+    logger.error(err);
   }
 };
-
 const dealwithNewBlock = async (blockheader) => {
   if (currentblock > blockheader.number) {
     logger.error("The new blockheader is behand local record");
