@@ -12,9 +12,7 @@ import { Queue } from "../queue";
 import { Log } from "web3-core";
 
 const STATE_FILE = path.resolve("./output/eth.json");
-
 const logQueue = new Queue<Log>();
-
 let currentBlock = 0;
 
 export const saveState = () => {
@@ -34,7 +32,7 @@ export const saveState = () => {
   }
 };
 
-const readState = () => {
+export const readState = () => {
   try {
     let state = JSON.parse(fs.readFileSync(STATE_FILE, "utf-8") || "{}");
     currentBlock = state.currentBlock || 0;
@@ -231,6 +229,14 @@ const _startAfterSync = async (callback) => {
 
 let lastTime = Date.now();
 
+const sleep = async (time: number) => {
+  return new Promise<void>((resolve) => {
+    setTimeout(() => {
+      resolve();
+    }, time);
+  });
+};
+
 const logsLoop = async () => {
   logger.info("start logsLoop loop");
   while (1) {
@@ -266,7 +272,7 @@ export const start = async () => {
         lastTime = Date.now();
       })
       .on("error", (err) => {
-        logger.error("Error: newBlockHeaders", JSON.stringify(err, null, "  "));
+        logger.error("Error: newBlockHeaders", err);
       });
 
     web3.eth
@@ -287,7 +293,7 @@ export const start = async () => {
         logger.warn("changed", JSON.stringify(changed, null, "  "));
       })
       .on("error", function (err) {
-        logger.error("Error: logs", JSON.stringify(err, null, "  "));
+        logger.error("Error: logs", err);
       });
 
     web3.eth
@@ -305,10 +311,10 @@ export const start = async () => {
         logQueue.push(data);
       })
       .on("changed", function (changed) {
-        logger.warn("changed", JSON.stringify(changed, null, "  "));
+        logger.warn("changed", changed);
       })
       .on("error", function (err) {
-        logger.error("Error: logs", JSON.stringify(err, null, "  "));
+        logger.error("Error: logs", err);
       });
 
     web3.eth
@@ -329,7 +335,7 @@ export const start = async () => {
         logger.warn("changed", JSON.stringify(changed, null, "  "));
       })
       .on("error", function (err) {
-        logger.error("Error: logs", JSON.stringify(err, null, "  "));
+        logger.error("Error: logs", err);
       });
   });
   logsLoop();

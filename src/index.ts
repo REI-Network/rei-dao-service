@@ -15,7 +15,7 @@ function startTask() {
   logger.info("Trying to start stake_monitor)");
   init().then(() => {
     stake_task.start();
-    block_task.start();
+    // block_task.start();
     api.start();
     startProcessListener();
   });
