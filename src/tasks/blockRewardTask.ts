@@ -1,65 +1,151 @@
-import fs from "fs";
 import path from "path";
 import { BlockReward } from "../models/BlockReward";
 import { logger } from "../logger/logger";
 import { config } from "../config/config";
 import sequelize from "../db/db";
 import { web3, getBlcokRewardFactor } from "../web3";
+import { Queue } from "../queue";
+import { BlockHeader } from "web3-eth";
+import { Op } from "sequelize";
 
 const STATE_FILE = path.resolve("./output/gxchain.json");
 const debug = process.env["NODE_ENV"] == "debug" ? 1 : 0;
+const countOnce = 10;
+const countLimit = 100;
 
-let currentblock = 0;
+const headerQueue = new Queue<BlockHeader>();
+let currentBlockNumber = 0;
 let rewardPerBlock: bigint;
 
-export const saveState = () => {
-  web3.eth.clearSubscriptions(() => {});
-  let dataToSave = {
-    timestamp: Date.now(),
-    currentblock,
-  };
-
-  const fileContent = JSON.stringify(dataToSave, null, "  ");
-  logger.debug("Saving gxchain2.json", fileContent);
-
-  try {
-    fs.writeFileSync(STATE_FILE, fileContent);
-  } catch (err) {
-    logger.error("ERROR : Saving gxchain2.json", err);
-  }
-};
-
-const readState = async () => {
+export async function readState() {
   logger.info("Start to read and sync state");
   const rewardFactor = await getBlcokRewardFactor();
   rewardPerBlock = BigInt(config.gxchain2.rewardPerBlock * rewardFactor);
+  let blockNumberNow = (await web3.eth.getBlock("latest")).number;
+  let acientblockNumber = await findAncient(blockNumberNow);
+  await _deleteForkBlocks(acientblockNumber);
+  while (blockNumberNow <= (await web3.eth.getBlock("latest")).number) {
+    await _catchBlock(acientblockNumber, blockNumberNow);
+    acientblockNumber = blockNumberNow++;
+  }
+  currentBlockNumber = acientblockNumber;
+}
+
+async function _tryGetBlcoks(latestHeight: number, count: number) {
   const transaction = await sequelize.transaction();
   try {
-    const lastInstance = await BlockReward.findOne({
+    const blocks = await BlockReward.findAll({
+      offset: latestHeight,
       order: [["blockNumber", "DESC"]],
+      limit: count,
       transaction,
     });
-    currentblock = lastInstance ? lastInstance.blockNumber : 0;
     await transaction.commit();
+    return blocks;
   } catch (err) {
     await transaction.rollback();
-    logger.err(err);
+    logger.error(err);
   }
+}
 
-  let blockNow = (await web3.eth.getBlock("latest")).number;
-  while (blockNow <= (await web3.eth.getBlock("latest")).number) {
-    _catchBlock(blockNow++);
+async function _findAncient(latestHeight: number, counter: number) {
+  while (counter > 0) {
+    const count = latestHeight >= countOnce ? countOnce : latestHeight;
+    counter -= count;
+    const blocks = await _tryGetBlcoks(latestHeight, count);
+    for (let i = blocks.length - 1; i >= 0; i--) {
+      try {
+        const databaseBlock = blocks[i];
+        const remoteBlock = await web3.eth.getBlock(databaseBlock.blockNumber);
+        if (remoteBlock.hash == databaseBlock.blockHash) {
+          return remoteBlock.number;
+        }
+      } catch (err) {
+        throw err;
+      }
+    }
+    latestHeight -= count;
   }
-};
+  return -1;
+}
 
-const _catchBlock = async (targetBlock) => {
-  while (currentblock <= targetBlock) {
-    const blockNow = await web3.eth.getBlock(currentblock++);
+async function findAncient(latestHeight: number): Promise<number> {
+  if (latestHeight == 0) {
+    return 0;
+  }
+  const ifEnough = latestHeight > countLimit ? true : false;
+  const counter = ifEnough ? countLimit : latestHeight;
+  const result = await _findAncient(latestHeight, counter);
+  if (result !== -1) {
+    return result;
+  }
+  if (ifEnough) {
+    let end = latestHeight - counter;
+    let start = 0;
+    let result = -1;
+    while (start <= end) {
+      const check = Math.floor((start + end) / 2);
+      const blocks = await _tryGetBlcoks(check, 1);
+      try {
+        const remoteBlock = await web3.eth.getBlock(blocks[0].blockNumber);
+        if (remoteBlock.hash == blocks[0].blockHash) {
+          start = check + 1;
+          result = remoteBlock.number;
+        } else {
+          end = check - 1;
+        }
+      } catch (err) {
+        throw err;
+      }
+    }
+    if (result !== -1) {
+      return result;
+    }
+  }
+  return 0;
+}
+
+async function checkAncient(blockheader: BlockHeader) {
+  const checkBlockNumber = blockheader.number - 1;
+  if (checkBlockNumber < 0) {
+    return true;
+  } else {
+    const transaction = await sequelize.transaction();
+    const databaseBlock = await BlockReward.findOne({
+      where: { blockHash: blockheader.parentHash },
+      transaction,
+    });
+    if (databaseBlock) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+}
+
+async function _deleteForkBlocks(ancientHeight: number) {
+  const transaction = await sequelize.transaction();
+  try {
+    await BlockReward.destroy({
+      where: {
+        blockNumber: { [Op.gt]: ancientHeight },
+      },
+      transaction,
+    });
+  } catch (err) {
+    await transaction.rollback();
+    throw err;
+  }
+}
+
+async function _catchBlock(fromBlock: number, targetBlock: number) {
+  while (fromBlock <= targetBlock) {
+    const blockNow = await web3.eth.getBlock(fromBlock++);
     await _createRecord(blockNow);
   }
-};
+}
 
-const _createRecord = async (block) => {
+async function _createRecord(block) {
   const transaction = await sequelize.transaction();
   try {
     const instance = await BlockReward.findByPk(block.number, { transaction });
@@ -81,16 +167,32 @@ const _createRecord = async (block) => {
     await transaction.rollback();
     logger.error(err);
   }
-};
-const dealwithNewBlock = async (blockheader) => {
-  if (currentblock > blockheader.number) {
+}
+
+async function dealwithNewBlock(blockheader) {
+  if (currentBlockNumber > blockheader.number) {
     logger.error("The new blockheader is behand local record");
   } else {
-    await _createRecord(blockheader);
+    headerQueue.push(blockheader);
   }
-};
+}
 
-const _startAfterSync = async (callback) => {
+async function headersLoop() {
+  logger.info("start headersLoop loop");
+  while (1) {
+    let header = headerQueue.pop();
+    if (!header) {
+      header = await new Promise<BlockHeader>((resolve) => {
+        headerQueue.queueresolve = resolve;
+      });
+    }
+    if (checkAncient(header)) {
+    } else {
+    }
+  }
+}
+
+async function _startAfterSync(callback) {
   try {
     let isSyncing = await web3.eth.isSyncing();
     if (isSyncing) {
@@ -110,7 +212,7 @@ const _startAfterSync = async (callback) => {
       _startAfterSync(callback);
     }, 60000);
   }
-};
+}
 
 export const start = async () => {
   await readState();

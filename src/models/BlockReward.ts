@@ -14,11 +14,11 @@ BlockReward.init(
   {
     blockNumber: {
       type: DataTypes.INTEGER,
-      primaryKey: true,
-      unique: true,
     },
     blockHash: {
       type: DataTypes.STRING,
+      primaryKey: true,
+      unique: true,
     },
     blockMiner: {
       type: DataTypes.STRING,

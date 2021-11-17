@@ -2,6 +2,7 @@ import Web3 from "web3";
 import { config } from "./config/config";
 import { configabi } from "./abi/config";
 import * as stake_task from "./tasks/stakeTask";
+import * as blockreward_task from "./tasks/blockRewardTask";
 
 const options = {
   timeout: 30000, // ms
@@ -32,6 +33,7 @@ const wspovider = new Web3.providers.WebsocketProvider(
 
 wspovider.on("connect", () => {
   stake_task.readState();
+  //blockreward_task.readState();
 });
 
 wspovider.on("error", () => {

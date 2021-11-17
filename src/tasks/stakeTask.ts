@@ -35,10 +35,10 @@ export const saveState = () => {
 export const readState = () => {
   try {
     let state = JSON.parse(fs.readFileSync(STATE_FILE, "utf-8") || "{}");
-    currentBlock = state.currentBlock || 0;
+    currentBlock = state.currentBlock || config.gxchain2.origin_block;
   } catch (ex) {
     console.error("Error reading eth.json", ex.message);
-    currentBlock = 0;
+    currentBlock = config.gxchain2.origin_block;
   }
 };
 
@@ -278,7 +278,7 @@ export const start = async () => {
     web3.eth
       .subscribe("logs", {
         fromBlock: currentBlock,
-        address: stakeManagerAddress,
+        address: [stakeManagerAddress],
         topics: [config.gxchain2.topics.Stake],
       })
       .on("connected", (subscriptionId) => {
@@ -299,7 +299,7 @@ export const start = async () => {
     web3.eth
       .subscribe("logs", {
         fromBlock: currentBlock,
-        address: stakeManagerAddress,
+        address: [stakeManagerAddress],
         topics: [config.gxchain2.topics.StartUnstake],
       })
       .on("connected", (subscriptionId) => {
@@ -320,7 +320,7 @@ export const start = async () => {
     web3.eth
       .subscribe("logs", {
         fromBlock: currentBlock,
-        address: stakeManagerAddress,
+        address: [stakeManagerAddress],
         topics: [config.gxchain2.topics.DoUnstake],
       })
       .on("connected", (subscriptionId) => {
