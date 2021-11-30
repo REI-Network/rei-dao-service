@@ -9,11 +9,13 @@ import { web3, getStakeManagerAddress } from "../web3";
 import { decodeLog } from "../abi/StakeMannger";
 import sequelize from "../db/db";
 import { Queue } from "../queue";
+import Semaphore from "semaphore-async-await";
 import { Log } from "web3-core";
 
 const STATE_FILE = path.resolve("./output/eth.json");
 const logQueue = new Queue<Log>();
 let currentBlock = 0;
+const lock = new Semaphore(1);
 
 export const saveState = () => {
   web3.eth.clearSubscriptions(() => {});
@@ -32,14 +34,16 @@ export const saveState = () => {
   }
 };
 
-export const readState = () => {
+export const readState = async () => {
+  await lock.acquire();
   try {
     let state = JSON.parse(fs.readFileSync(STATE_FILE, "utf-8") || "{}");
     currentBlock = state.currentBlock || config.gxchain2.origin_block;
   } catch (ex) {
-    console.error("Error reading eth.json", ex.message);
+    logger.error("Error reading eth.json", ex.message);
     currentBlock = config.gxchain2.origin_block;
   }
+  lock.release();
 };
 
 const dealWithTopic = async (receipt) => {
@@ -67,17 +71,21 @@ const dealWithTopic = async (receipt) => {
 const dealWithStake = async (receipt, tx) => {
   logger.info("New Stake tx detected : ", tx.hash);
   const transaction = await sequelize.transaction();
-  let instance = await Stake.findByPk(tx.hash, { transaction });
-  if (!instance) {
-    let stakeParams = decodeLog("Stake", receipt.data, receipt.topics.slice(1));
-    if (
-      stakeParams.validator &&
-      stakeParams.value &&
-      stakeParams.to &&
-      stakeParams.shares
-    ) {
-      logger.info("Creating new record of Stake");
-      try {
+  try {
+    let instance = await Stake.findByPk(tx.hash, { transaction });
+    if (!instance) {
+      let stakeParams = decodeLog(
+        "Stake",
+        receipt.data,
+        receipt.topics.slice(1)
+      );
+      if (
+        stakeParams.validator &&
+        stakeParams.value &&
+        stakeParams.to &&
+        stakeParams.shares
+      ) {
+        logger.info("Creating new record of Stake");
         await Stake.create(
           {
             txHash: tx.hash,
@@ -89,16 +97,16 @@ const dealWithStake = async (receipt, tx) => {
           },
           { transaction }
         );
-        await transaction.commit();
-      } catch (err) {
-        logger.error(err);
-        await transaction.rollback();
+      } else {
+        logger.log("Illegal Stake record find", stakeParams, tx);
       }
     } else {
-      logger.log("Illegal Stake record find", stakeParams, tx);
+      logger.error(`The tx ${tx.hash} already exist in Stake records, skip`);
     }
-  } else {
-    logger.error(`The tx ${tx.hash} already exist in Stake records, skip`);
+    await transaction.commit();
+  } catch (err) {
+    await transaction.rollback();
+    logger.error(err);
   }
 };
 
@@ -252,7 +260,6 @@ const logsLoop = async () => {
 
 export const start = async () => {
   const stakeManagerAddress = await getStakeManagerAddress();
-  readState();
   _startAfterSync(() => {
     web3.eth
       .subscribe("newBlockHeaders")
@@ -287,7 +294,7 @@ export const start = async () => {
         });
       })
       .on("data", (data) => {
-        dealWithTopic(data);
+        logQueue.push(data);
       })
       .on("changed", function (changed) {
         logger.warn("changed", JSON.stringify(changed, null, "  "));
