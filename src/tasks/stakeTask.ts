@@ -190,13 +190,14 @@ const dealWithDoUnStake = async (receipt, tx) => {
           },
           { transaction }
         );
+        logger.debug("~~~~~~~~~~~ start unstake");
         const unstake = await Unstake.findOne({
           where: { id: DoUnstakeParams.id },
           transaction,
         });
-        console.log("~~~~~~~~~~~ unstake founds", unstake);
+        logger.debug("~~~~~~~~~~~ unstake founds", unstake);
         if (unstake) {
-          console.log("~~~~~~~~~~~~~~~~~~~~~~~ state change");
+          logger.log("~~~~~~~~~~~~~~~~~~~~~~~ state change");
           unstake.state = 1;
           unstake.amount = BigInt(DoUnstakeParams.amount);
           unstake.unstakedtimestamp = BigInt(timestamp);
