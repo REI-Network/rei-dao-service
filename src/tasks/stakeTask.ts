@@ -196,7 +196,7 @@ const dealWithDoUnStake = async (receipt, tx) => {
         });
         if (unstake) {
           unstake.state = 1;
-          unstake.amount = DoUnstakeParams.amount;
+          unstake.amount = BigInt(DoUnstakeParams.amount);
           unstake.unstakedtimestamp = BigInt(timestamp);
           await unstake.save({ transaction });
         }

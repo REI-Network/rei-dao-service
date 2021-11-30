@@ -8,7 +8,7 @@ export declare interface DoUnStake {
   from: string;
   validator: string;
   to: string;
-  amount: string;
+  amount: bigint;
   timestamp: string;
 }
 
@@ -36,7 +36,7 @@ DoUnStake.init(
       comment: "to address",
     },
     amount: {
-      type: DataTypes.STRING,
+      type: DataTypes.BIGINT({ length: 80, unsigned: true }),
       comment: "GXC amount",
     },
     timestamp: {

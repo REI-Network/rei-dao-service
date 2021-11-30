@@ -6,39 +6,37 @@ import sequelize from "../db/db";
 import { web3, getBlcokRewardFactor } from "../web3";
 import { Queue } from "../queue";
 import { BlockHeader } from "web3-eth";
+import Semaphore from "semaphore-async-await";
 import { Op } from "sequelize";
 
-const STATE_FILE = path.resolve("./output/gxchain.json");
+// const STATE_FILE = path.resolve("./output/gxchain.json");
 const debug = process.env["NODE_ENV"] == "debug" ? 1 : 0;
 const countOnce = 10;
 const countLimit = 100;
+const lock = new Semaphore(1);
 
 const headerQueue = new Queue<BlockHeader>();
-let currentBlockNumber = 0;
-let rewardPerBlock: bigint;
+let rewardPerBlock: string;
 
 export async function readState() {
+  await lock.acquire();
   logger.info("Start to read and sync state");
   const rewardFactor = await getBlcokRewardFactor();
-  rewardPerBlock = BigInt(config.gxchain2.rewardPerBlock * rewardFactor);
-  let blockNumberNow = (await web3.eth.getBlock("latest")).number;
-  let acientblockNumber = await findAncient(blockNumberNow);
-  await _deleteForkBlocks(acientblockNumber);
-  while (blockNumberNow <= (await web3.eth.getBlock("latest")).number) {
-    await _catchBlock(acientblockNumber, blockNumberNow);
-    acientblockNumber = blockNumberNow++;
-  }
-  currentBlockNumber = acientblockNumber;
+  rewardPerBlock = BigInt(
+    (config.gxchain2.rewardPerBlock * rewardFactor) / 100
+  ).toString();
+  const blockNow = await web3.eth.getBlock("latest");
+  headerQueue.push(blockNow);
+  logger.info("End read and sync state");
+  lock.release();
 }
 
-async function _tryGetBlcoks(latestHeight: number, count: number) {
+async function _tryGetBlcoks(start: number, end: number) {
   const transaction = await sequelize.transaction();
   try {
     const blocks = await BlockReward.findAll({
-      offset: latestHeight,
+      where: { blockNumber: { [Op.between]: [start, end] } },
       order: [["blockNumber", "DESC"]],
-      limit: count,
-      transaction,
     });
     await transaction.commit();
     return blocks;
@@ -51,9 +49,9 @@ async function _tryGetBlcoks(latestHeight: number, count: number) {
 async function _findAncient(latestHeight: number, counter: number) {
   while (counter > 0) {
     const count = latestHeight >= countOnce ? countOnce : latestHeight;
-    counter -= count;
-    const blocks = await _tryGetBlcoks(latestHeight, count);
-    for (let i = blocks.length - 1; i >= 0; i--) {
+    const start = latestHeight - count;
+    const blocks = await _tryGetBlcoks(start, latestHeight);
+    for (let i = 0; i < blocks.length; i++) {
       try {
         const databaseBlock = blocks[i];
         const remoteBlock = await web3.eth.getBlock(databaseBlock.blockNumber);
@@ -64,6 +62,7 @@ async function _findAncient(latestHeight: number, counter: number) {
         throw err;
       }
     }
+    counter -= count;
     latestHeight -= count;
   }
   return -1;
@@ -85,17 +84,21 @@ async function findAncient(latestHeight: number): Promise<number> {
     let result = -1;
     while (start <= end) {
       const check = Math.floor((start + end) / 2);
-      const blocks = await _tryGetBlcoks(check, 1);
-      try {
-        const remoteBlock = await web3.eth.getBlock(blocks[0].blockNumber);
-        if (remoteBlock.hash == blocks[0].blockHash) {
-          start = check + 1;
-          result = remoteBlock.number;
-        } else {
-          end = check - 1;
+      const blocks = await _tryGetBlcoks(check, check);
+      if (blocks[0]) {
+        try {
+          const remoteBlock = await web3.eth.getBlock(blocks[0].blockNumber);
+          if (remoteBlock.hash == blocks[0].blockHash) {
+            start = check + 1;
+            result = remoteBlock.number;
+          } else {
+            end = check - 1;
+          }
+        } catch (err) {
+          throw err;
         }
-      } catch (err) {
-        throw err;
+      } else {
+        end = check - 1;
       }
     }
     if (result !== -1) {
@@ -111,14 +114,20 @@ async function checkAncient(blockheader: BlockHeader) {
     return true;
   } else {
     const transaction = await sequelize.transaction();
-    const databaseBlock = await BlockReward.findOne({
-      where: { blockHash: blockheader.parentHash },
-      transaction,
-    });
-    if (databaseBlock) {
-      return true;
-    } else {
-      return false;
+    try {
+      const databaseBlock = await BlockReward.findOne({
+        where: { blockHash: blockheader.parentHash },
+        transaction,
+      });
+      await transaction.commit();
+      if (databaseBlock !== null) {
+        return true;
+      } else {
+        return false;
+      }
+    } catch (err) {
+      logger.error(err);
+      await transaction.rollback();
     }
   }
 }
@@ -132,10 +141,17 @@ async function _deleteForkBlocks(ancientHeight: number) {
       },
       transaction,
     });
+    await transaction.commit();
   } catch (err) {
     await transaction.rollback();
-    throw err;
+    logger.error(err);
   }
+}
+
+async function _restoreBlockRecord(blockNumberNow: number) {
+  let acientblockNumber = await findAncient(blockNumberNow);
+  await _deleteForkBlocks(acientblockNumber);
+  await _catchBlock(acientblockNumber + 1, blockNumberNow);
 }
 
 async function _catchBlock(fromBlock: number, targetBlock: number) {
@@ -145,7 +161,7 @@ async function _catchBlock(fromBlock: number, targetBlock: number) {
   }
 }
 
-async function _createRecord(block) {
+async function _createRecord(block: BlockHeader) {
   const transaction = await sequelize.transaction();
   try {
     const instance = await BlockReward.findByPk(block.number, { transaction });
@@ -156,24 +172,23 @@ async function _createRecord(block) {
           blockHash: block.hash,
           blockMiner: block.miner,
           blockReward: rewardPerBlock,
+          nonce: block.nonce,
+          transactionRoot: block.transactionRoot,
+          stateRoot: block.stateRoot,
+          receiptRoot: block.receiptRoot,
+          gasLimit: block.gasLimit,
+          gasUsed: block.gasUsed,
+          timestamp: block.timestamp,
         },
         { transaction }
       );
-      await transaction.commit();
     } else {
       logger.error("the block exist in record, skip");
     }
+    await transaction.commit();
   } catch (err) {
     await transaction.rollback();
     logger.error(err);
-  }
-}
-
-async function dealwithNewBlock(blockheader) {
-  if (currentBlockNumber > blockheader.number) {
-    logger.error("The new blockheader is behand local record");
-  } else {
-    headerQueue.push(blockheader);
   }
 }
 
@@ -186,8 +201,10 @@ async function headersLoop() {
         headerQueue.queueresolve = resolve;
       });
     }
-    if (checkAncient(header)) {
+    if (await checkAncient(header)) {
+      await _createRecord(header);
     } else {
+      await _restoreBlockRecord(header.number);
     }
   }
 }
@@ -215,20 +232,19 @@ async function _startAfterSync(callback) {
 }
 
 export const start = async () => {
-  await readState();
   _startAfterSync(async () => {
     web3.eth
       .subscribe("newBlockHeaders")
       .on("connected", (subscriptionId) => {
         logger.info("New block header subscribed", { subscriptionId });
       })
-      .on("data", (blockheader: any) => {
+      .on("data", async (blockheader: any) => {
         if (debug) {
-          if (blockheader.transactions.length >= 1) {
-            dealwithNewBlock(blockheader);
+          if ((await blockheader.transactions.length) >= 1) {
+            headerQueue.push(blockheader);
           }
         } else {
-          dealwithNewBlock(blockheader);
+          headerQueue.push(blockheader);
         }
       })
       .on("changed", function (changed) {
@@ -238,4 +254,5 @@ export const start = async () => {
         logger.error("Error: logs", JSON.stringify(err, null, "  "));
       });
   });
+  headersLoop();
 };

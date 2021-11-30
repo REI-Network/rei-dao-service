@@ -7,11 +7,11 @@ export declare interface Unstake {
   id: number;
   from: string;
   validator: string;
-  value: string;
+  value: bigint;
   to: string;
-  unstakeShares: string;
+  unstakeShares: bigint;
   timestamp: bigint;
-  amount: string;
+  amount: bigint;
   state: number;
   unstakedtimestamp: bigint;
 }
@@ -36,7 +36,7 @@ Unstake.init(
       comment: "validator address",
     },
     value: {
-      type: DataTypes.STRING,
+      type: DataTypes.BIGINT({ length: 80, unsigned: true }),
       comment: "stake value",
     },
     to: {
@@ -44,7 +44,7 @@ Unstake.init(
       comment: "to address",
     },
     unstakeShares: {
-      type: DataTypes.STRING,
+      type: DataTypes.BIGINT({ length: 80, unsigned: true }),
       comment: "Number of unstake shares to be burned",
     },
     timestamp: {
@@ -52,7 +52,7 @@ Unstake.init(
       comment: "timestamp",
     },
     amount: {
-      type: DataTypes.STRING,
+      type: DataTypes.BIGINT({ length: 80, unsigned: true }),
       comment: "GXC amount",
     },
     state: {

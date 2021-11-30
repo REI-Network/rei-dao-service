@@ -6,9 +6,9 @@ export declare interface Stake {
   txHash: string;
   from: string;
   validator: string;
-  value: string;
+  value: bigint;
   to: string;
-  shares: string;
+  shares: bigint;
 }
 
 Stake.init(
@@ -27,7 +27,7 @@ Stake.init(
       comment: "validator address",
     },
     value: {
-      type: DataTypes.STRING,
+      type: DataTypes.BIGINT({ length: 80, unsigned: true }),
       comment: "stake value",
     },
     to: {
@@ -35,7 +35,7 @@ Stake.init(
       comment: "to address",
     },
     shares: {
-      type: DataTypes.STRING,
+      type: DataTypes.BIGINT({ length: 80, unsigned: true }),
       comment: "shares value",
     },
   },
