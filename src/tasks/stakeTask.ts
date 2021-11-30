@@ -91,9 +91,9 @@ const dealWithStake = async (receipt, tx) => {
             txHash: tx.hash,
             from: tx.from,
             validator: stakeParams.validator,
-            value: stakeParams.value,
+            value: BigInt(stakeParams.value),
             to: stakeParams.to,
-            shares: stakeParams.shares,
+            shares: BigInt(stakeParams.shares),
           },
           { transaction }
         );
@@ -136,9 +136,9 @@ const dealWithStartUnstake = async (receipt, tx) => {
             txHash: tx.hash,
             from: tx.from,
             validator: startUnstakeParams.validator,
-            value: startUnstakeParams.value,
+            value: BigInt(startUnstakeParams.value),
             to: startUnstakeParams.to,
-            unstakeShares: startUnstakeParams.unstakeShares,
+            unstakeShares: BigInt(startUnstakeParams.unstakeShares),
             timestamp: startUnstakeParams.timestamp,
             state: 0,
           },
@@ -185,7 +185,7 @@ const dealWithDoUnStake = async (receipt, tx) => {
             validator: DoUnstakeParams.validator,
             id: DoUnstakeParams.id,
             to: DoUnstakeParams.to,
-            amount: DoUnstakeParams.amount,
+            amount: BigInt(DoUnstakeParams.amount),
             timestamp: timestamp,
           },
           { transaction }
