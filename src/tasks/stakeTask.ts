@@ -194,10 +194,13 @@ const dealWithDoUnStake = async (receipt, tx) => {
           where: { id: DoUnstakeParams.id },
           transaction,
         });
+        console.log("~~~~~~~~~~~ unstake founds", unstake);
         if (unstake) {
+          console.log("~~~~~~~~~~~~~~~~~~~~~~~ state change");
           unstake.state = 1;
           unstake.amount = BigInt(DoUnstakeParams.amount);
           unstake.unstakedtimestamp = BigInt(timestamp);
+          await unstake.save({ transaction });
         }
       } else {
         logger.log("Illegal Stake record find", DoUnstakeParams, tx);
