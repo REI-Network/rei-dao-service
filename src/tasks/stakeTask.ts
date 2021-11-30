@@ -113,23 +113,23 @@ const dealWithStake = async (receipt, tx) => {
 const dealWithStartUnstake = async (receipt, tx) => {
   logger.info("New StartUnstake tx detected : ", tx.hash);
   const transaction = await sequelize.transaction();
-  let instance = await Unstake.findByPk(tx.hash, { transaction });
-  if (!instance) {
-    let startUnstakeParams = decodeLog(
-      "StartUnstake",
-      receipt.data,
-      receipt.topics.slice(1)
-    );
-    if (
-      startUnstakeParams.id &&
-      startUnstakeParams.validator &&
-      startUnstakeParams.value &&
-      startUnstakeParams.to &&
-      startUnstakeParams.unstakeShares &&
-      startUnstakeParams.timestamp
-    ) {
-      logger.info("Creating new record of StartUnstake");
-      try {
+  try {
+    let instance = await Unstake.findByPk(tx.hash, { transaction });
+    if (!instance) {
+      let startUnstakeParams = decodeLog(
+        "StartUnstake",
+        receipt.data,
+        receipt.topics.slice(1)
+      );
+      if (
+        startUnstakeParams.id &&
+        startUnstakeParams.validator &&
+        startUnstakeParams.value &&
+        startUnstakeParams.to &&
+        startUnstakeParams.unstakeShares &&
+        startUnstakeParams.timestamp
+      ) {
+        logger.info("Creating new record of StartUnstake");
         await Unstake.create(
           {
             id: startUnstakeParams.id,
@@ -144,18 +144,18 @@ const dealWithStartUnstake = async (receipt, tx) => {
           },
           { transaction }
         );
-        await transaction.commit();
-      } catch (err) {
-        logger.error(err);
-        await transaction.rollback();
+      } else {
+        logger.log("Illegal withdraw record find", startUnstakeParams, tx);
       }
     } else {
-      logger.log("Illegal withdraw record find", startUnstakeParams, tx);
+      logger.error(
+        `The tx ${tx.hash} already exist in startUnstake records, skip`
+      );
     }
-  } else {
-    logger.error(
-      `The tx ${tx.hash} already exist in startUnstake records, skip`
-    );
+    await transaction.commit();
+  } catch (err) {
+    logger.error(err);
+    await transaction.rollback();
   }
 };
 
@@ -163,21 +163,21 @@ const dealWithDoUnStake = async (receipt, tx) => {
   logger.info("New DoUnStake tx detected : ", tx.hash);
   const timestamp = (await web3.eth.getBlock(tx.blockNumber)).timestamp;
   const transaction = await sequelize.transaction();
-  let instance = await DoUnStake.findByPk(tx.hash, { transaction });
-  if (!instance) {
-    let DoUnstakeParams = decodeLog(
-      "DoUnstake",
-      receipt.data,
-      receipt.topics.slice(1)
-    );
-    if (
-      DoUnstakeParams.validator &&
-      DoUnstakeParams.id &&
-      DoUnstakeParams.to &&
-      DoUnstakeParams.amount
-    ) {
-      logger.info("Creating new record of DoUnstake");
-      try {
+  try {
+    let instance = await DoUnStake.findByPk(tx.hash, { transaction });
+    if (!instance) {
+      let DoUnstakeParams = decodeLog(
+        "DoUnstake",
+        receipt.data,
+        receipt.topics.slice(1)
+      );
+      if (
+        DoUnstakeParams.validator &&
+        DoUnstakeParams.id &&
+        DoUnstakeParams.to &&
+        DoUnstakeParams.amount
+      ) {
+        logger.info("Creating new record of DoUnstake");
         await DoUnStake.create(
           {
             txHash: tx.hash,
@@ -198,18 +198,19 @@ const dealWithDoUnStake = async (receipt, tx) => {
           unstake.state = 1;
           unstake.amount = BigInt(DoUnstakeParams.amount);
           unstake.unstakedtimestamp = BigInt(timestamp);
-          await unstake.save({ transaction });
         }
-        await transaction.commit();
-      } catch (err) {
-        logger.error(err);
-        await transaction.rollback();
+      } else {
+        logger.log("Illegal Stake record find", DoUnstakeParams, tx);
       }
     } else {
-      logger.log("Illegal Stake record find", DoUnstakeParams, tx);
+      logger.error(
+        `The tx ${tx.hash} already exist in DoUnstake records, skip`
+      );
     }
-  } else {
-    logger.error(`The tx ${tx.hash} already exist in DoUnstake records, skip`);
+    await transaction.commit();
+  } catch (err) {
+    logger.error(err);
+    await transaction.rollback();
   }
 };
 
