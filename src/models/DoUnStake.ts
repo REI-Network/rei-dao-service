@@ -36,7 +36,7 @@ DoUnStake.init(
       comment: "to address",
     },
     amount: {
-      type: DataTypes.BIGINT({ length: 80, unsigned: true }),
+      type: DataTypes.DECIMAL(65, 0),
       comment: "GXC amount",
     },
     timestamp: {

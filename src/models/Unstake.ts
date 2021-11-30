@@ -36,7 +36,7 @@ Unstake.init(
       comment: "validator address",
     },
     value: {
-      type: DataTypes.BIGINT({ length: 80, unsigned: true }),
+      type: DataTypes.DECIMAL(65, 0),
       comment: "stake value",
     },
     to: {
@@ -44,7 +44,7 @@ Unstake.init(
       comment: "to address",
     },
     unstakeShares: {
-      type: DataTypes.BIGINT({ length: 80, unsigned: true }),
+      type: DataTypes.DECIMAL(65, 0),
       comment: "Number of unstake shares to be burned",
     },
     timestamp: {
@@ -52,7 +52,7 @@ Unstake.init(
       comment: "timestamp",
     },
     amount: {
-      type: DataTypes.BIGINT({ length: 80, unsigned: true }),
+      type: DataTypes.DECIMAL(65, 0),
       comment: "GXC amount",
     },
     state: {

@@ -27,7 +27,7 @@ Stake.init(
       comment: "validator address",
     },
     value: {
-      type: DataTypes.BIGINT({ length: 80, unsigned: true }),
+      type: DataTypes.DECIMAL(65, 0),
       comment: "stake value",
     },
     to: {
@@ -35,7 +35,7 @@ Stake.init(
       comment: "to address",
     },
     shares: {
-      type: DataTypes.BIGINT({ length: 80, unsigned: true }),
+      type: DataTypes.DECIMAL(65, 0),
       comment: "shares value",
     },
   },
