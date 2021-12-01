@@ -6,7 +6,7 @@ import DoUnStake from "../models/DoUnStake";
 import { logger } from "../logger/logger";
 import { config } from "../config/config";
 import { web3, getStakeManagerAddress } from "../web3";
-import { decodeLog } from "../abi/StakeMannger";
+import { stakeDecodeLog } from "../abi/StakeMannger";
 import sequelize from "../db/db";
 import { Queue } from "../queue";
 import Semaphore from "semaphore-async-await";
@@ -21,7 +21,7 @@ export const saveState = () => {
   web3.eth.clearSubscriptions(() => {});
 
   let dataToSave = {
-    timestamp: new Date().getTime(),
+    timestamp: new Date().toISOString(),
     currentBlock,
   };
 
@@ -74,7 +74,7 @@ const dealWithStake = async (receipt, tx) => {
   try {
     let instance = await Stake.findByPk(tx.hash, { transaction });
     if (!instance) {
-      let stakeParams = decodeLog(
+      let stakeParams = stakeDecodeLog(
         "Stake",
         receipt.data,
         receipt.topics.slice(1)
@@ -116,7 +116,7 @@ const dealWithStartUnstake = async (receipt, tx) => {
   try {
     let instance = await Unstake.findByPk(tx.hash, { transaction });
     if (!instance) {
-      let startUnstakeParams = decodeLog(
+      let startUnstakeParams = stakeDecodeLog(
         "StartUnstake",
         receipt.data,
         receipt.topics.slice(1)
@@ -166,7 +166,7 @@ const dealWithDoUnStake = async (receipt, tx) => {
   try {
     let instance = await DoUnStake.findByPk(tx.hash, { transaction });
     if (!instance) {
-      let DoUnstakeParams = decodeLog(
+      let DoUnstakeParams = stakeDecodeLog(
         "DoUnstake",
         receipt.data,
         receipt.topics.slice(1)
@@ -292,7 +292,7 @@ export const start = async () => {
         topics: [config.gxchain2.topics.Stake],
       })
       .on("connected", (subscriptionId) => {
-        logger.log("Log subscribed from block:", currentBlock, {
+        logger.log("Log subscribed for Stake from block:", currentBlock, {
           subscriptionId,
         });
       })
@@ -313,9 +313,13 @@ export const start = async () => {
         topics: [config.gxchain2.topics.StartUnstake],
       })
       .on("connected", (subscriptionId) => {
-        logger.log("Log subscribed from block:", currentBlock, {
-          subscriptionId,
-        });
+        logger.log(
+          "Log subscribed for StartUnstake from block:",
+          currentBlock,
+          {
+            subscriptionId,
+          }
+        );
       })
       .on("data", (data) => {
         logQueue.push(data);
@@ -334,7 +338,7 @@ export const start = async () => {
         topics: [config.gxchain2.topics.DoUnstake],
       })
       .on("connected", (subscriptionId) => {
-        logger.log("Log subscribed from block:", currentBlock, {
+        logger.log("Log subscribed for DoUnstake from block:", currentBlock, {
           subscriptionId,
         });
       })

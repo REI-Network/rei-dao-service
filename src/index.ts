@@ -1,5 +1,6 @@
 import * as stake_task from "./tasks/stakeTask";
 import * as block_task from "./tasks/blockRewardTask";
+import * as fee_task from "./tasks/feeTask";
 import { logger } from "./logger/logger";
 import fs from "fs";
 import { init } from "./db/db";
@@ -14,6 +15,7 @@ startTask();
 function startTask() {
   logger.info("Trying to start stake_monitor)");
   init().then(() => {
+    fee_task.start();
     stake_task.start();
     // block_task.start();
     api.start();

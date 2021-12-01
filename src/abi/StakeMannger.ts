@@ -756,7 +756,7 @@ export const stakeabi = [
   },
 ];
 
-export const decodeLog = (name, log, topics) => {
+export const stakeDecodeLog = (name, log, topics) => {
   let abiItem = stakeabi.find((item) => {
     return item.name == name && item.type === "event";
   });
