@@ -167,23 +167,6 @@ export const start = async () => {
   const feeAddress = await getFeeAddress();
   _startAfterSync(() => {
     web3.eth
-      .subscribe("newBlockHeaders")
-      .on("connected", (subscriptionId) => {
-        logger.info("New block header subscribed", { subscriptionId });
-      })
-      .on("data", (blockheader) => {
-        logger.info(
-          "New block:",
-          blockheader.number,
-          "Gas used:",
-          blockheader.gasUsed / blockheader.gasLimit
-        );
-      })
-      .on("error", (err) => {
-        logger.error("Error: newBlockHeaders", err);
-      });
-
-    web3.eth
       .subscribe("logs", {
         fromBlock: currentBlock,
         address: [feeAddress],
