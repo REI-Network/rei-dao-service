@@ -65,3 +65,67 @@ curl 'http://127.0.0.1:3031/api/Unstake?to=0x70997970C51812dc3A010C7d01b50e0d17d
 - unstakeShares:销毁的shares数量 
 - amount:实际取回的gxc数量，未取回时为null
 - unstakedtimestamp:取回gxc的时间戳
+
+
+--------------------
+### Deposit
+
+获取抵押fee的信息
+
+```sh
+curl 'http://127.0.0.1:3032/api/Deposit?address=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266&offset=0&limit=2' | json_pp
+```
+
+参数信息:
+```
+ address  // 地址
+ offset    // 查询起始
+ limit     // 一次查询个数
+```
+
+返回信息：
+```json
+{
+   "depositToAddress" : [
+      {
+         "txHash" : "0x857b3ad999b7018ef252d7242c319a0aca26969bd4c82b4235f7b08110a0c2ed",
+         "by" : "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+         "updatedAt" : "2021-12-02T11:08:19.000Z",
+         "amount" : "100000",
+         "to" : "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+         "createdAt" : "2021-12-02T11:08:19.000Z"
+      },
+      {
+         "txHash" : "0x96f4575d5a86a642da619b03c02565836497419cabf920a5f9a4a6d829c993c4",
+         "by" : "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+         "amount" : "100000",
+         "updatedAt" : "2021-12-01T10:13:50.000Z",
+         "to" : "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+         "createdAt" : "2021-12-01T10:13:50.000Z"
+      }
+   ],
+   "depositFromAddress" : [
+      {
+         "txHash" : "0x857b3ad999b7018ef252d7242c319a0aca26969bd4c82b4235f7b08110a0c2ed",
+         "by" : "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+         "createdAt" : "2021-12-02T11:08:19.000Z",
+         "to" : "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+         "updatedAt" : "2021-12-02T11:08:19.000Z",
+         "amount" : "100000"
+      },
+      {
+         "txHash" : "0x96f4575d5a86a642da619b03c02565836497419cabf920a5f9a4a6d829c993c4",
+         "amount" : "100000",
+         "updatedAt" : "2021-12-01T10:13:50.000Z",
+         "to" : "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+         "createdAt" : "2021-12-01T10:13:50.000Z",
+         "by" : "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+      }
+   ]
+}
+```
+
+depositToAddress: 质押给address的对象
+
+depositFromAddress: address发起的质押对象
+
