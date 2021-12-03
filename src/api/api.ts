@@ -24,19 +24,32 @@ router.get("/Unstake", async (req, res) => {
   }
 });
 
-router.get("/Deposit", async (req, res) => {
+router.get("/Depositby", async (req, res) => {
   try {
     const offset = req.query.offset ? Number(req.query.offset) : 0;
     const limit = req.query.limit ? Number(req.query.limit) : 10;
     const address = req.query.address;
-    const depositFromAddress = await Deposit.findAll({
+    const depositByAddress = await Deposit.findAll({
+      order: [["createdAt", "ASC"]],
       offset: offset,
       limit: limit,
       where: {
         by: address,
       },
     });
+    res.send({ depositByAddress });
+  } catch (err) {
+    res.send(err);
+  }
+});
+
+router.get("/Depositto", async (req, res) => {
+  try {
+    const offset = req.query.offset ? Number(req.query.offset) : 0;
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
+    const address = req.query.address;
     const depositToAddress = await Deposit.findAll({
+      order: [["createdAt", "ASC"]],
       offset: offset,
       limit: limit,
       where: {
@@ -44,7 +57,7 @@ router.get("/Deposit", async (req, res) => {
       },
     });
 
-    res.send({ depositFromAddress, depositToAddress });
+    res.send({ depositToAddress });
   } catch (err) {
     res.send(err);
   }
