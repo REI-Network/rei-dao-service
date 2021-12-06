@@ -151,3 +151,43 @@ curl 'http://127.0.0.1:3032/api/Depositto?address=0xf39Fd6e51aad88F6F4ce6aB88272
 depositToAddress: address接收的质押对象
 
 
+--------------------
+### Stake
+
+获取地址发起的抵押投票的信息
+
+```sh
+curl 'http://127.0.0.1:3032/api/Stake?from=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266&offset=0&limit=2' | json_pp
+```
+
+参数信息:
+```
+ from  // 发起质押的地址
+ offset    // 查询起始
+ limit     // 一次查询个数
+```
+
+返回信息：
+```json
+{
+   "result" : [
+      {
+         "from" : "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+         "value" : "79",
+         "txHash" : "0x4b56096cabdadd06e5b0d1e8b5a4bbf46720adf57182b2983c5f0a08ac1433c3",
+         "to" : "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+         "validator" : "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199",
+         "createdAt" : "2021-12-06T09:07:52.000Z",
+         "updatedAt" : "2021-12-06T09:07:52.000Z",
+         "shares" : "79"
+      }
+   ]
+}
+```
+- result:所有记录的数组
+- txHash :发起Stake的交易哈希
+- validator:质押的验证者地址
+- from: 发起者地址
+- value: 抵押的rei数量
+- shares:获得的shares数量
+
