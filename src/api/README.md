@@ -191,3 +191,26 @@ curl 'http://127.0.0.1:3032/api/Stake?from=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb
 - value: 抵押的rei数量
 - shares:获得的shares数量
 
+-------------------------
+### MyStakeAddress
+
+获取地址质押过的节点地址
+
+```sh
+curl 'http://127.0.0.1:3032/api/MyStakeAddress?from=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' | json_pp
+```
+参数信息：
+```
+from 需要查询的地址
+```
+
+返回信息：
+```json
+{
+   "validators" : [
+      "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199",
+      "0x898B84b6a6430EEd36A6cfC14a1cB7DA326c91C4",
+      "0xF5Bb2643DE948C2bDc451D985100F667A2912B16"
+   ]
+}
+```

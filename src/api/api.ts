@@ -46,6 +46,29 @@ router.get("/Stake", async (req, res) => {
   }
 });
 
+router.get("/MyStakeAddress", async (req, res) => {
+  try {
+    const from = req.query.from;
+    const results = await Stake.findAll({
+      order: [["validator", "ASC"]],
+      where: {
+        from: from,
+      },
+    });
+    let validator: string = null;
+    let validators = [];
+    results.map((result) => {
+      if (validator != result.validator) {
+        validator = result.validator;
+        validators.push(validator);
+      }
+    });
+    res.send({ validators });
+  } catch (err) {
+    res.send(err);
+  }
+});
+
 router.get("/Depositby", async (req, res) => {
   try {
     const offset = req.query.offset ? Number(req.query.offset) : 0;
