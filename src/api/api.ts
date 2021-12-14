@@ -1,4 +1,5 @@
 import express from "express";
+import sequelize from "../db/db";
 import Deposit from "../models/Deposit";
 import Stake from "../models/Stake";
 import Unstake from "../models/Unstake";
@@ -50,18 +51,15 @@ router.get("/MyStakeAddress", async (req, res) => {
   try {
     const from = req.query.from;
     const results = await Stake.findAll({
-      order: [["validator", "ASC"]],
+      group: ["validator"],
+      attributes: ["validator"],
       where: {
         from: from,
       },
     });
-    let validator: string = null;
     let validators = [];
-    results.map((result) => {
-      if (validator != result.validator) {
-        validator = result.validator;
-        validators.push(validator);
-      }
+    results.map((validator) => {
+      validators.push(validator.validator);
     });
     res.send({ validators });
   } catch (err) {
