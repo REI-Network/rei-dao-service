@@ -15,6 +15,8 @@ export declare interface BlockReward {
   gasLimit: number;
   gasUsed: number;
   timestamp: string;
+  globalTimestamp: bigint;
+  assignReword: boolean;
 }
 
 BlockReward.init(
@@ -31,7 +33,7 @@ BlockReward.init(
       type: DataTypes.STRING,
     },
     blockReward: {
-      type: DataTypes.BIGINT({ length: 80, unsigned: true }),
+      type: DataTypes.DECIMAL(65, 0),
     },
     nonce: {
       type: DataTypes.STRING,
@@ -54,9 +56,17 @@ BlockReward.init(
     timestamp: {
       type: DataTypes.INTEGER,
     },
+    globalTimestamp: {
+      type: DataTypes.BIGINT,
+    },
+    assignReword: {
+      type: DataTypes.BOOLEAN,
+    },
   },
   {
     sequelize,
     tableName: "blockReward",
   }
 );
+
+export default BlockReward;
